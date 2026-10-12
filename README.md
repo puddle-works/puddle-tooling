@@ -49,10 +49,15 @@ jobs:
     uses: puddle-works/puddle-tooling/.github/workflows/publish.yml@v0.1.0
     with:
       visibility: private
-      dry-run: true       # false pushes; needs the SWAMP_API_KEY secret
+      dry-run: true       # false pushes
     secrets:
       SWAMP_API_KEY: ${{ secrets.SWAMP_API_KEY }}
 ```
+
+The publish workflow needs the `SWAMP_API_KEY` secret even for a dry run,
+because every swamp command needs an account. Create a key for the collective
+with `swamp auth token create --collective <collective> --scopes extensions:push`
+and store it as a repository secret.
 
 Pin the workflow `@vX.Y.Z` and, when you move to a newer release, change
 `TOOLING_REF` in `puddle.mk` (or the `tooling-ref` input) with it. The two

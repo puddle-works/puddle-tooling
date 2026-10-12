@@ -1,7 +1,8 @@
 # Reusable workflow: call it from a puddle repo with
 #   uses: puddle-works/puddle-tooling/.github/workflows/publish.yml@v0.1.0
 # It runs the same publish script as `make publish`. dry-run defaults to true;
-# a real push needs dry-run: false and the SWAMP_API_KEY secret.
+# swamp needs the SWAMP_API_KEY secret even for a dry run; a real push also
+# needs dry-run: false and a key with the extensions:push scope.
 name: publish
 
 on:
@@ -29,8 +30,8 @@ on:
         default: 2.9.7
     secrets:
       SWAMP_API_KEY:
-        description: swamp-club API key; needed to push, not for a dry run
-        required: false
+        description: swamp-club API key (scope extensions:push to push)
+        required: true
 
 permissions:
   contents: read
@@ -49,8 +50,11 @@ jobs:
 
       - name: Install swamp
         run: |
-          curl -fsSL https://swamp-club.com/install | sh
+          mkdir -p "$HOME/.local/bin"
+          export PATH="$HOME/.local/bin:$PATH"
+          curl -fsSL https://swamp-club.com/install.sh | sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          swamp version
 
       - name: Publish
         env:
