@@ -1,0 +1,35 @@
+# Reusable workflow: call it from a puddle repo with
+#   uses: puddle-works/puddle-tooling/.github/workflows/contracts-check.yml@v0.1.0
+name: contracts-check
+
+on:
+  workflow_call:
+    inputs:
+      tooling-ref:
+        description: puddle-tooling tag or branch whose check to run
+        type: string
+        default: v0.1.0
+      deno-version:
+        description: Deno version (match swamp's bundled Deno)
+        type: string
+        default: 2.9.7
+
+permissions:
+  contents: read
+
+jobs:
+  contracts-check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: ${{ inputs.deno-version }}
+
+      - name: Check workflow data reads
+        env:
+          TOOLING_REF: ${{ inputs.tooling-ref }}
+        run: deno run --allow-read --allow-env "https://raw.githubusercontent.com/puddle-works/puddle-tooling/${TOOLING_REF}/contracts/check.ts"
