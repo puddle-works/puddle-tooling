@@ -1,0 +1,142 @@
+#!/bin/sh
+# Tests `make publish` (from puddle.mk, running scripts/publish.sh) against a
+# stubbed swamp:
+# - it refuses a missing VISIBILITY and a VISIBILITY the manifest does not
+#   declare, before running anything;
+# - it stops when the tests fail or the dry run reports a review warning;
+# - with DRY_RUN=1 it stops after a clean dry run, without pushing;
+# - otherwise it pushes once, never with --yes, with the review reports read
+#   from the repo root.
+set -u
+root=$(cd "$(dirname "$0")/.." && pwd)
+make=${MAKE:-make}
+tmp=$(cd "$(mktemp -d)" && pwd -P)
+trap 'rm -rf "$tmp"' EXIT
+
+mkdir -p "$tmp/stubs" "$tmp/repo"
+cp "$root/puddle.mk" "$tmp/repo/"
+echo 'include puddle.mk' > "$tmp/repo/Makefile"
+cat > "$tmp/repo/manifest.yaml" <<'YAML'
+manifestVersion: 1
+name: "@mesgme/demo"
+version: "2026.10.08.1"
+visibility: public
+models:
+  - demo.ts
+YAML
+cat > "$tmp/stubs/swamp" <<STUB
+#!/bin/sh
+echo "\$* REVIEW_DIR=\${SWAMP_EXTENSION_REVIEW_DIR:-}" >> "$tmp/swamp-calls"
+case "\$1 \$2" in
+  "doctor extensions") echo '{"denoPath":"true"}' ;;
+  "extension fmt") ;;
+  "extension quality") echo '{"percentage":85,"gateFailures":[]}' ;;
+  "extension push")
+    case "\$*" in
+      *--dry-run*)
+        if [ -f "$tmp/warn" ]; then
+          echo '{"status":"dry_run","contentHash":"abc","warnings":{"review":[{"ruleId":"adversarial-review-report","message":"No adversarial review recorded","file":"/repo/swamp-extension-review/_mesgme_demo-abc.json"}],"versionDrift":[{"output":"first publish"}]}}'
+        else
+          echo '{"status":"dry_run","contentHash":"abc","warnings":{"versionDrift":[{"output":"first publish"}]}}'
+        fi ;;
+      *)
+        # The real push reports no contentHash; a mismatch is only caught when
+        # it does report one.
+        if [ -f "$tmp/drift" ]; then
+          echo '{"status":"pushed","contentHash":"zzz"}'
+        else
+          echo '{"status":"pushed"}'
+        fi ;;
+    esac ;;
+esac
+STUB
+chmod +x "$tmp/stubs/swamp"
+
+fail=0
+# run <make args...>: runs make publish with the stub swamp on PATH. MAKEFLAGS
+# and the environment are cleaned so a parent `make publish` (which runs these
+# tests) does not pass its own VISIBILITY and DRY_RUN down.
+run() {
+  rm -f "$tmp/swamp-calls" "$tmp/tests-ran"
+  env -u MAKEFLAGS -u MFLAGS -u MAKELEVEL -u VISIBILITY -u DRY_RUN PATH="$tmp/stubs:$PATH" $make -s -C "$tmp/repo" publish \
+    PUDDLE_TOOLING_DIR="$root" DENO=true PUBLISH_TESTS="touch $tmp/tests-ran" "$@" >"$tmp/out" 2>&1
+}
+pushed() { grep -E '^extension push ' "$tmp/swamp-calls" 2>/dev/null | grep -qv -- --dry-run; }
+
+# refuses <label> <expected text> <make args...>
+refuses() {
+  label=$1 want=$2; shift 2
+  if run "$@"; then
+    echo "FAIL: publish succeeded with $label"; cat "$tmp/out"; fail=1
+  elif ! grep -q -- "$want" "$tmp/out"; then
+    echo "FAIL: publish with $label did not say '$want'"; cat "$tmp/out"; fail=1
+  elif [ -f "$tmp/tests-ran" ] || pushed; then
+    echo "FAIL: publish with $label ran the tests or pushed"; fail=1
+  else
+    echo "ok  publish refuses $label"
+  fi
+}
+
+refuses "no VISIBILITY" "set VISIBILITY"
+refuses "a VISIBILITY the manifest does not declare" "declares visibility 'public'" \
+  VISIBILITY=private
+
+if run VISIBILITY=public PUBLISH_TESTS=false; then
+  echo "FAIL: publish succeeded although the tests failed"; fail=1
+elif pushed; then
+  echo "FAIL: publish pushed although the tests failed"; fail=1
+else
+  echo "ok  publish stops when the tests fail"
+fi
+
+touch "$tmp/warn"
+if run VISIBILITY=public; then
+  echo "FAIL: publish succeeded with an unresolved review warning"; fail=1
+elif pushed; then
+  echo "FAIL: publish pushed with an unresolved review warning"; fail=1
+elif ! grep -q "/repo/swamp-extension-review/_mesgme_demo-abc.json" "$tmp/out"; then
+  echo "FAIL: publish did not name the review report to write"; cat "$tmp/out"; fail=1
+else
+  echo "ok  publish stops on a review warning and names the report"
+fi
+rm "$tmp/warn"
+
+if ! run VISIBILITY=public; then
+  echo "FAIL: publish failed on a clean puddle"; cat "$tmp/out"; fail=1
+elif [ ! -f "$tmp/tests-ran" ]; then
+  echo "FAIL: publish did not run the tests"; fail=1
+elif ! pushed; then
+  echo "FAIL: publish did not push"; cat "$tmp/swamp-calls"; fail=1
+elif grep '^extension push ' "$tmp/swamp-calls" | grep -qE -- ' (-y|--yes|-f|--force|--visibility)( |$)'; then
+  echo "FAIL: publish pushed with a waiver or a visibility flag"; cat "$tmp/swamp-calls"; fail=1
+elif grep '^extension push ' "$tmp/swamp-calls" | grep -qv "REVIEW_DIR=$tmp/repo$"; then
+  echo "FAIL: publish did not read reviews from the repo root"; cat "$tmp/swamp-calls"; fail=1
+else
+  echo "ok  publish pushes a clean puddle once, without --yes"
+fi
+if ! grep -q "published @mesgme/demo@2026.10.08.1 (abc)" "$tmp/out"; then
+  echo "FAIL: publish did not report what it published"; cat "$tmp/out"; fail=1
+else
+  echo "ok  publish reports the name, version and dry-run hash"
+fi
+
+if ! run VISIBILITY=public DRY_RUN=1; then
+  echo "FAIL: a DRY_RUN=1 publish failed on a clean repo"; cat "$tmp/out"; fail=1
+elif pushed; then
+  echo "FAIL: a DRY_RUN=1 publish pushed"; fail=1
+elif ! grep -q "dry run only" "$tmp/out"; then
+  echo "FAIL: a DRY_RUN=1 publish did not say it stopped"; cat "$tmp/out"; fail=1
+else
+  echo "ok  DRY_RUN=1 stops after the dry run without pushing"
+fi
+
+touch "$tmp/drift"
+if run VISIBILITY=public; then
+  echo "FAIL: publish succeeded although the pushed hash differs"; fail=1
+elif ! grep -q "differs from the dry run" "$tmp/out"; then
+  echo "FAIL: publish did not report the hash difference"; cat "$tmp/out"; fail=1
+else
+  echo "ok  publish fails when the pushed hash differs"
+fi
+rm "$tmp/drift"
+exit "$fail"

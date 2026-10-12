@@ -1,0 +1,64 @@
+# Reusable workflow: call it from a puddle repo with
+#   uses: puddle-works/puddle-tooling/.github/workflows/publish.yml@v0.1.0
+# It runs the same publish script as `make publish`. dry-run defaults to true;
+# a real push needs dry-run: false and the SWAMP_API_KEY secret.
+name: publish
+
+on:
+  workflow_call:
+    inputs:
+      visibility:
+        description: public or private; must match the manifest
+        type: string
+        required: true
+      dry-run:
+        description: Stop after a clean dry run, before pushing
+        type: boolean
+        default: true
+      tests:
+        description: Command run before publishing
+        type: string
+        default: make test
+      tooling-ref:
+        description: puddle-tooling tag or branch whose script to run
+        type: string
+        default: v0.1.0
+      deno-version:
+        description: Deno version (match swamp's bundled Deno)
+        type: string
+        default: 2.9.7
+    secrets:
+      SWAMP_API_KEY:
+        description: swamp-club API key; needed to push, not for a dry run
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: ${{ inputs.deno-version }}
+
+      - name: Install swamp
+        run: |
+          curl -fsSL https://swamp-club.com/install | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Publish
+        env:
+          SWAMP_API_KEY: ${{ secrets.SWAMP_API_KEY }}
+          VISIBILITY: ${{ inputs.visibility }}
+          DRY_RUN: ${{ inputs.dry-run && '1' || '' }}
+          PUBLISH_TESTS: ${{ inputs.tests }}
+          TOOLING_REF: ${{ inputs.tooling-ref }}
+        run: |
+          export DENO="$(command -v deno)"
+          curl -fsSL "https://raw.githubusercontent.com/puddle-works/puddle-tooling/${TOOLING_REF}/scripts/publish.sh" | sh
