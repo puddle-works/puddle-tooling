@@ -19,10 +19,16 @@ PUBLISH_TESTS ?= $(MAKE) test
 
 ifdef PUDDLE_TOOLING_DIR
 tooling_src = $(PUDDLE_TOOLING_DIR)
-tooling_script = sh $(PUDDLE_TOOLING_DIR)/scripts/publish.sh
+tooling_script = env DENO="$(DENO)" VISIBILITY="$(VISIBILITY)" \
+  DRY_RUN="$(DRY_RUN)" PUBLISH_TESTS="$(PUBLISH_TESTS)" \
+  sh $(PUDDLE_TOOLING_DIR)/scripts/publish.sh
 else
 tooling_src = $(TOOLING_URL)
-tooling_script = curl -fsSL $(TOOLING_URL)/scripts/publish.sh | sh
+# The settings sit on `sh`, not on `curl`: a prefix before a pipeline only
+# reaches its first command.
+tooling_script = curl -fsSL $(TOOLING_URL)/scripts/publish.sh | env \
+  DENO="$(DENO)" VISIBILITY="$(VISIBILITY)" DRY_RUN="$(DRY_RUN)" \
+  PUBLISH_TESTS="$(PUBLISH_TESTS)" sh
 endif
 
 .PHONY: contracts-check guardrails-check publish
@@ -34,5 +40,4 @@ guardrails-check: ## Check every workflow declares maxReruns and maxWallClock
 	$(DENO) run --allow-read $(tooling_src)/guardrails/check.ts
 
 publish: ## Publish the extension (VISIBILITY=public|private, DRY_RUN=1 to stop early)
-	DENO="$(DENO)" VISIBILITY="$(VISIBILITY)" DRY_RUN="$(DRY_RUN)" \
-	  PUBLISH_TESTS="$(PUBLISH_TESTS)" $(tooling_script)
+	$(tooling_script)

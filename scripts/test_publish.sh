@@ -15,7 +15,7 @@ trap 'rm -rf "$tmp"' EXIT
 
 mkdir -p "$tmp/stubs" "$tmp/repo"
 cp "$root/puddle.mk" "$tmp/repo/"
-echo 'include puddle.mk' > "$tmp/repo/Makefile"
+printf 'include puddle.mk\ntest:\n\ttouch %s\n' "$tmp/tests-ran" > "$tmp/repo/Makefile"
 cat > "$tmp/repo/manifest.yaml" <<'YAML'
 manifestVersion: 1
 name: "@mesgme/demo"
@@ -139,4 +139,24 @@ else
   echo "ok  publish fails when the pushed hash differs"
 fi
 rm "$tmp/drift"
+
+# Without PUDDLE_TOOLING_DIR the script is fetched with curl and piped to sh.
+# The settings (DENO and PUBLISH_TESTS come from puddle.mk's defaults, which make
+# does not export) must reach sh, not curl. A stub curl serves the local script.
+cat > "$tmp/stubs/curl" <<STUB
+#!/bin/sh
+cat "$root/scripts/publish.sh"
+STUB
+chmod +x "$tmp/stubs/curl"
+rm -f "$tmp/swamp-calls" "$tmp/tests-ran"
+if ! env -u MAKEFLAGS -u MFLAGS -u MAKELEVEL -u VISIBILITY -u DRY_RUN -u PUDDLE_TOOLING_DIR PATH="$tmp/stubs:$PATH" \
+    $make -s -C "$tmp/repo" publish VISIBILITY=public DRY_RUN=1 >"$tmp/out" 2>&1; then
+  echo "FAIL: a publish using the fetched script failed"; cat "$tmp/out"; fail=1
+elif ! grep -q "dry run only" "$tmp/out"; then
+  echo "FAIL: a publish using the fetched script did not stop at the dry run"; cat "$tmp/out"; fail=1
+elif [ ! -f "$tmp/tests-ran" ]; then
+  echo "FAIL: a publish using the fetched script did not run make test"; fail=1
+else
+  echo "ok  publish passes its settings to the fetched script"
+fi
 exit "$fail"
