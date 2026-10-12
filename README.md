@@ -42,11 +42,11 @@ The same checks run in CI by calling the reusable workflows:
 ```yaml
 jobs:
   contracts:
-    uses: puddle-works/puddle-tooling/.github/workflows/contracts-check.yml@v0.1.0
+    uses: puddle-works/puddle-tooling/.github/workflows/contracts-check.yml@v0.1.1
   guardrails:
-    uses: puddle-works/puddle-tooling/.github/workflows/guardrails-check.yml@v0.1.0
+    uses: puddle-works/puddle-tooling/.github/workflows/guardrails-check.yml@v0.1.1
   publish:
-    uses: puddle-works/puddle-tooling/.github/workflows/publish.yml@v0.1.0
+    uses: puddle-works/puddle-tooling/.github/workflows/publish.yml@v0.1.1
     with:
       visibility: private
       dry-run: true       # false pushes
@@ -71,7 +71,7 @@ A repo whose workflows read another model's data through `data.latest` adds a
 `contracts.ts` that exports `CONTRACTS`, importing the types from this repo:
 
 ```ts
-import type { Contracts } from "https://raw.githubusercontent.com/puddle-works/puddle-tooling/v0.1.0/contracts/check.ts";
+import type { Contracts } from "https://raw.githubusercontent.com/puddle-works/puddle-tooling/v0.1.1/contracts/check.ts";
 import { model as thing } from "./extensions/models/thing.ts";
 
 export const CONTRACTS: Contracts = {
