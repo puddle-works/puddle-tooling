@@ -3,8 +3,9 @@
 # `make publish VISIBILITY=public|private` (see puddle.mk), from the repo root.
 # DRY_RUN=1 stops after a clean dry run, before anything is pushed.
 #
-# VISIBILITY must match the manifest's `visibility:`. It is not passed to
-# swamp: a --visibility flag changes the content hash, so the review report
+# VISIBILITY must match the manifest's `visibility:`; a manifest with no
+# `visibility:` line is public, as in swamp (puddleworks-apps#93). It is not
+# passed to swamp: a --visibility flag changes the content hash, so the review report
 # written for the dry run would not match the real push (apps#49).
 #
 # The push is gated on a clean dry run instead of a prompt, so it never needs
@@ -20,8 +21,9 @@ case "${VISIBILITY:-}" in
   *) die "set VISIBILITY=public or VISIBILITY=private" ;;
 esac
 declared=$(sed -n 's/^visibility: *"*\([a-z]*\)"*.*/\1/p' "$manifest")
+declared=${declared:-public}
 [ "$declared" = "$VISIBILITY" ] || die "$manifest declares visibility \
-'${declared:-none}', not '$VISIBILITY'. Set 'visibility: $VISIBILITY' in the \
+'$declared', not '$VISIBILITY'. Set 'visibility: $VISIBILITY' in the \
 manifest and commit it; it is never passed as a flag."
 
 echo "==> tests"
