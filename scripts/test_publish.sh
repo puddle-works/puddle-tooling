@@ -2,7 +2,8 @@
 # Tests `make publish` (from puddle.mk, running scripts/publish.sh) against a
 # stubbed swamp:
 # - it refuses a missing VISIBILITY and a VISIBILITY the manifest does not
-#   declare, before running anything;
+#   declare, before running anything (a manifest with no visibility: line
+#   declares public);
 # - it stops when the tests fail or the dry run reports a review warning;
 # - with DRY_RUN=1 it stops after a clean dry run, without pushing;
 # - otherwise it pushes once, never with --yes, with the review reports read
@@ -52,13 +53,20 @@ esac
 STUB
 chmod +x "$tmp/stubs/swamp"
 
+# A second repo whose manifest has no visibility: line. Drafts leave it out for
+# public (puddleworks#184, puddleworks-apps#93).
+mkdir -p "$tmp/repo-default"
+cp "$tmp/repo/puddle.mk" "$tmp/repo/Makefile" "$tmp/repo-default/"
+grep -v '^visibility:' "$tmp/repo/manifest.yaml" > "$tmp/repo-default/manifest.yaml"
+
 fail=0
-# run <make args...>: runs make publish with the stub swamp on PATH. MAKEFLAGS
-# and the environment are cleaned so a parent `make publish` (which runs these
-# tests) does not pass its own VISIBILITY and DRY_RUN down.
+# run <make args...>: runs make publish in $repo with the stub swamp on PATH.
+# MAKEFLAGS and the environment are cleaned so a parent `make publish` (which
+# runs these tests) does not pass its own VISIBILITY and DRY_RUN down.
+repo=$tmp/repo
 run() {
   rm -f "$tmp/swamp-calls" "$tmp/tests-ran"
-  env -u MAKEFLAGS -u MFLAGS -u MAKELEVEL -u VISIBILITY -u DRY_RUN PATH="$tmp/stubs:$PATH" $make -s -C "$tmp/repo" publish \
+  env -u MAKEFLAGS -u MFLAGS -u MAKELEVEL -u VISIBILITY -u DRY_RUN PATH="$tmp/stubs:$PATH" $make -s -C "$repo" publish \
     PUDDLE_TOOLING_DIR="$root" DENO=true PUBLISH_TESTS="touch $tmp/tests-ran" "$@" >"$tmp/out" 2>&1
 }
 pushed() { grep -E '^extension push ' "$tmp/swamp-calls" 2>/dev/null | grep -qv -- --dry-run; }
@@ -139,6 +147,21 @@ else
   echo "ok  publish fails when the pushed hash differs"
 fi
 rm "$tmp/drift"
+
+repo=$tmp/repo-default
+refuses "private for a manifest with no visibility line" \
+  "declares visibility 'public'" VISIBILITY=private
+if ! run VISIBILITY=public; then
+  echo "FAIL: publish refused public for a manifest with no visibility line"
+  cat "$tmp/out"; fail=1
+elif ! pushed; then
+  echo "FAIL: publish did not push a manifest with no visibility line"; fail=1
+elif grep '^extension push ' "$tmp/swamp-calls" | grep -q -- '--visibility'; then
+  echo "FAIL: publish passed a visibility flag"; cat "$tmp/swamp-calls"; fail=1
+else
+  echo "ok  publish treats a missing visibility line as public"
+fi
+repo=$tmp/repo
 
 # Without PUDDLE_TOOLING_DIR the script is fetched with curl and piped to sh.
 # The settings (DENO and PUBLISH_TESTS come from puddle.mk's defaults, which make

@@ -33,7 +33,8 @@ make publish VISIBILITY=private DRY_RUN=1   # stop after the dry run
 make publish VISIBILITY=private             # push
 ```
 
-`VISIBILITY` must equal `visibility:` in the repo's `manifest.yaml`. It is not
+`VISIBILITY` must equal `visibility:` in the repo's `manifest.yaml`; a manifest
+with no `visibility:` line is public. It is not
 passed to swamp, because a `--visibility` flag changes the content hash and the
 committed review report would no longer match.
 
