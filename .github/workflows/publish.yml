@@ -1,5 +1,5 @@
 # Reusable workflow: call it from a puddle repo with
-#   uses: puddle-works/puddle-tooling/.github/workflows/publish.yml@v0.1.1
+#   uses: puddle-works/puddle-tooling/.github/workflows/publish.yml@v0.2.0
 # It runs the same publish script as `make publish`. dry-run defaults to true;
 # swamp needs the SWAMP_API_KEY and SWAMP_SIGNIN_TOKEN secrets even for a dry
 # run (both come from `swamp auth token create`); a real push also
@@ -24,7 +24,7 @@ on:
       tooling-ref:
         description: puddle-tooling tag or branch whose script to run
         type: string
-        default: v0.1.1
+        default: v0.2.0
       deno-version:
         description: Deno version (match swamp's bundled Deno)
         type: string

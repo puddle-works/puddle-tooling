@@ -10,6 +10,7 @@ copying the code.
 | Path | What it does |
 |---|---|
 | `contracts/check.ts` | Fails when a workflow reads `data.latest(...)` fields its extension does not write. Reads the repo's own `contracts.ts`. |
+| `fingerprint/fingerprint.ts` | Hashes the inputs a `prepare` method saw and checks them again in `run`, so a gap between the two (a manual approval, say) cannot build output from stale input. |
 | `guardrails/check.ts` | Fails when a workflow lacks the `maxReruns` (3 to 10) and `maxWallClock` (up to 24h) tags. |
 | `scripts/publish.sh` | Tests, type-checks, quality-gates and dry-runs the extension, then pushes it. Never uses `--yes`. |
 | `puddle.mk` | Make targets that run the above from the tagged release. |
@@ -43,11 +44,11 @@ The same checks run in CI by calling the reusable workflows:
 ```yaml
 jobs:
   contracts:
-    uses: puddle-works/puddle-tooling/.github/workflows/contracts-check.yml@v0.1.1
+    uses: puddle-works/puddle-tooling/.github/workflows/contracts-check.yml@v0.2.0
   guardrails:
-    uses: puddle-works/puddle-tooling/.github/workflows/guardrails-check.yml@v0.1.1
+    uses: puddle-works/puddle-tooling/.github/workflows/guardrails-check.yml@v0.2.0
   publish:
-    uses: puddle-works/puddle-tooling/.github/workflows/publish.yml@v0.1.1
+    uses: puddle-works/puddle-tooling/.github/workflows/publish.yml@v0.2.0
     with:
       visibility: private
       dry-run: true       # false pushes
@@ -72,7 +73,7 @@ A repo whose workflows read another model's data through `data.latest` adds a
 `contracts.ts` that exports `CONTRACTS`, importing the types from this repo:
 
 ```ts
-import type { Contracts } from "https://raw.githubusercontent.com/puddle-works/puddle-tooling/v0.1.1/contracts/check.ts";
+import type { Contracts } from "https://raw.githubusercontent.com/puddle-works/puddle-tooling/v0.2.0/contracts/check.ts";
 import { model as thing } from "./extensions/models/thing.ts";
 
 export const CONTRACTS: Contracts = {
@@ -83,11 +84,26 @@ export const CONTRACTS: Contracts = {
 A repo with no `contracts.ts` has no contracts, so a workflow that reads
 instance data fails the check until one is added.
 
+## Fingerprint
+
+An extension whose workflow has a `prepare` step and a later `run` step imports
+the fingerprint helper by tagged URL. Swamp's bundler inlines it when it
+bundles the extension, so the published package has no network import.
+
+```ts
+import { assertFresh, fingerprint } from "https://raw.githubusercontent.com/puddle-works/puddle-tooling/v0.2.0/fingerprint/fingerprint.ts";
+
+// prepare: store the hash of what it read
+const stored = await fingerprint(note, settings.outputFolder);
+// run: read it again and stop if it changed
+assertFresh(stored, await fingerprint(note, settings.outputFolder), "The daily note");
+```
+
 ## Develop
 
 ```sh
-deno fmt --check contracts guardrails
-deno test --allow-read --allow-write contracts guardrails
+deno fmt --check contracts guardrails fingerprint
+deno test --allow-read --allow-write contracts guardrails fingerprint
 sh scripts/test_publish.sh
 ```
 
