@@ -58,7 +58,23 @@ SWAMP_EXTENSION_REVIEW_DIR=$(pwd)
 export SWAMP_EXTENSION_REVIEW_DIR
 
 echo "==> swamp extension push --dry-run"
-swamp extension push "$manifest" --dry-run --json >"$out"
+version=$(sed -n 's/^version: *"*\([^"]*\)"*.*/\1/p' "$manifest")
+already_published=
+if ! swamp extension push "$manifest" --dry-run --json >"$out"; then
+  # A failed registry check exits 1 but still prints the dry run. A version
+  # that is already in the registry is expected in CI on a PR that does not
+  # bump it, and on main after a publish; any other failed check stops here.
+  failed=$(jq -r '[.registryChecks // [] | .[] | select(.status == "failed")]
+    | map(.name) | join(" ")' "$out" 2>/dev/null) || failed=
+  if [ "$failed" != version-exists ]; then
+    jq -r '.registryChecks // [] | .[] | select(.status == "failed")
+      | "  - [\(.name)] \(.message)"' "$out" >&2 2>/dev/null || true
+    die "the dry run failed; nothing was pushed"
+  fi
+  [ -n "${DRY_RUN:-}" ] || die "$version is already published; bump version: \
+in $manifest (swamp extension version shows the next one) and run again"
+  already_published=1
+fi
 # Version drift is informational; every other warning family blocks.
 if [ "$(jq '[.warnings // {} | to_entries[] | select(.key != "versionDrift") | .value[]] | length' "$out")" != 0 ]; then
   jq -r '.warnings | to_entries[] | select(.key != "versionDrift") | .value[]
@@ -69,6 +85,9 @@ report path with every verdict filled in) and run again. Never push with --yes."
 fi
 hash=$(jq -r .contentHash "$out")
 echo "content hash: $hash"
+if [ -n "$already_published" ]; then
+  echo "note: $version is already published; bump version: in $manifest before the next publish"
+fi
 if [ -n "${DRY_RUN:-}" ]; then
   echo "dry run only; nothing was pushed"
   exit 0
@@ -83,4 +102,4 @@ swamp extension push "$manifest" --json >"$out"
 pushed_hash=$(jq -r '.contentHash // empty' "$out")
 [ -z "$pushed_hash" ] || [ "$pushed_hash" = "$hash" ] ||
   die "pushed content hash $pushed_hash differs from the dry run's $hash"
-echo "published $(sed -n 's/^name: *"*\([^"]*\)"*.*/\1/p' "$manifest")@$(sed -n 's/^version: *"*\([^"]*\)"*.*/\1/p' "$manifest") ($hash)"
+echo "published $(sed -n 's/^name: *"*\([^"]*\)"*.*/\1/p' "$manifest")@$version ($hash)"

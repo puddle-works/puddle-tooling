@@ -39,16 +39,21 @@ with no `visibility:` line is public. It is not
 passed to swamp, because a `--visibility` flag changes the content hash and the
 committed review report would no longer match.
 
+A dry run of a version that is already in the registry passes with a note to
+bump `version:`, so CI stays green on PRs that do not publish and on `main`
+after a publish. A real push of that version stops and says to bump it. Any
+other failed registry check stops both.
+
 The same checks run in CI by calling the reusable workflows:
 
 ```yaml
 jobs:
   contracts:
-    uses: puddle-works/puddle-tooling/.github/workflows/contracts-check.yml@v0.2.0
+    uses: puddle-works/puddle-tooling/.github/workflows/contracts-check.yml@v0.2.1
   guardrails:
-    uses: puddle-works/puddle-tooling/.github/workflows/guardrails-check.yml@v0.2.0
+    uses: puddle-works/puddle-tooling/.github/workflows/guardrails-check.yml@v0.2.1
   publish:
-    uses: puddle-works/puddle-tooling/.github/workflows/publish.yml@v0.2.0
+    uses: puddle-works/puddle-tooling/.github/workflows/publish.yml@v0.2.1
     with:
       visibility: private
       dry-run: true       # false pushes
@@ -73,7 +78,7 @@ A repo whose workflows read another model's data through `data.latest` adds a
 `contracts.ts` that exports `CONTRACTS`, importing the types from this repo:
 
 ```ts
-import type { Contracts } from "https://raw.githubusercontent.com/puddle-works/puddle-tooling/v0.2.0/contracts/check.ts";
+import type { Contracts } from "https://raw.githubusercontent.com/puddle-works/puddle-tooling/v0.2.1/contracts/check.ts";
 import { model as thing } from "./extensions/models/thing.ts";
 
 export const CONTRACTS: Contracts = {
@@ -91,7 +96,7 @@ the fingerprint helper by tagged URL. Swamp's bundler inlines it when it
 bundles the extension, so the published package has no network import.
 
 ```ts
-import { assertFresh, fingerprint } from "https://raw.githubusercontent.com/puddle-works/puddle-tooling/v0.2.0/fingerprint/fingerprint.ts";
+import { assertFresh, fingerprint } from "https://raw.githubusercontent.com/puddle-works/puddle-tooling/v0.2.1/fingerprint/fingerprint.ts";
 
 // prepare: store the hash of what it read
 const stored = await fingerprint(note, settings.outputFolder);
