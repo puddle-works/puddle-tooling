@@ -35,7 +35,18 @@ case "\$1 \$2" in
   "extension push")
     case "\$*" in
       *--dry-run*)
-        if [ -f "$tmp/warn" ]; then
+        # swamp prints the dry-run JSON, the error on stderr, and exits 1 when
+        # a registry check fails.
+        if [ -f "$tmp/published" ] || [ -f "$tmp/not-member" ]; then
+          if [ -f "$tmp/published" ]; then
+            check='{"name":"version-exists","status":"failed","message":"Version 2026.10.08.1 already exists for @mesgme/demo."}'
+          else
+            check='{"name":"collective-membership","status":"failed","message":"You are not a member of @mesgme."}'
+          fi
+          echo "{\"status\":\"dry_run\",\"contentHash\":\"abc\",\"registryChecks\":[{\"name\":\"authentication\",\"status\":\"passed\"},\$check]}"
+          echo '{"error":"a registry check failed"}' >&2
+          exit 1
+        elif [ -f "$tmp/warn" ]; then
           echo '{"status":"dry_run","contentHash":"abc","warnings":{"review":[{"ruleId":"adversarial-review-report","message":"No adversarial review recorded","file":"/repo/swamp-extension-review/_mesgme_demo-abc.json"}],"versionDrift":[{"output":"first publish"}]}}'
         else
           echo '{"status":"dry_run","contentHash":"abc","warnings":{"versionDrift":[{"output":"first publish"}]}}'
@@ -137,6 +148,41 @@ elif ! grep -q "dry run only" "$tmp/out"; then
 else
   echo "ok  DRY_RUN=1 stops after the dry run without pushing"
 fi
+
+# A version that is already in the registry: a dry run (CI on a PR that does
+# not bump the version, or main after a publish) passes with a notice; a real
+# push stops before pushing and says to bump.
+touch "$tmp/published"
+if ! run VISIBILITY=public DRY_RUN=1; then
+  echo "FAIL: a dry run failed because the version is already published"; cat "$tmp/out"; fail=1
+elif pushed; then
+  echo "FAIL: a dry run of a published version pushed"; fail=1
+elif ! grep -q "2026.10.08.1 is already published" "$tmp/out"; then
+  echo "FAIL: a dry run did not say the version is already published"; cat "$tmp/out"; fail=1
+else
+  echo "ok  DRY_RUN=1 passes with a notice when the version is already published"
+fi
+if run VISIBILITY=public; then
+  echo "FAIL: publish succeeded although the version is already published"; fail=1
+elif pushed; then
+  echo "FAIL: publish pushed a version that is already published"; fail=1
+elif ! grep -q "bump version:" "$tmp/out"; then
+  echo "FAIL: publish did not say to bump the version"; cat "$tmp/out"; fail=1
+else
+  echo "ok  publish of an already published version says to bump it"
+fi
+rm "$tmp/published"
+
+# Any other failed registry check stops even a dry run.
+touch "$tmp/not-member"
+if run VISIBILITY=public DRY_RUN=1; then
+  echo "FAIL: a dry run passed with a failed membership check"; fail=1
+elif ! grep -q "not a member of @mesgme" "$tmp/out"; then
+  echo "FAIL: a dry run did not name the failed registry check"; cat "$tmp/out"; fail=1
+else
+  echo "ok  DRY_RUN=1 stops on any other failed registry check"
+fi
+rm "$tmp/not-member"
 
 touch "$tmp/drift"
 if run VISIBILITY=public; then
