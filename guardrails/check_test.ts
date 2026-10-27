@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { checkWorkflow, parseDuration } from "./check.ts";
+import { checkRepo, checkWorkflow, parseDuration } from "./check.ts";
 
 const wf = (tags: string) => `name: w\nversion: 1\n${tags}jobs: []\n`;
 
@@ -49,4 +49,28 @@ Deno.test("maxWallClock must be a duration of at most 24h", () => {
 Deno.test("unquoted YAML numbers are rejected: tags must be strings", () => {
   const y = wf("tags:\n  maxReruns: 5\n  maxWallClock: 30m\n");
   assertEquals(checkWorkflow(y).length, 1);
+});
+
+Deno.test("a repo with no workflows folder has no problems", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    assertEquals(await checkRepo(root), []);
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+Deno.test("checkRepo names the workflow each problem is in", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    await Deno.mkdir(`${root}/workflows`);
+    await Deno.writeTextFile(`${root}/workflows/workflow-a.yaml`, wf(""));
+    const problems = await checkRepo(root);
+    assertEquals(problems.length > 0, true);
+    for (const p of problems) {
+      assertEquals(p.startsWith("workflows/workflow-a.yaml: "), true, p);
+    }
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
 });

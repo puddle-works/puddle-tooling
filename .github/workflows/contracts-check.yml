@@ -1,5 +1,5 @@
 # Reusable workflow: call it from a puddle repo with
-#   uses: puddle-works/puddle-tooling/.github/workflows/contracts-check.yml@v0.1.1
+#   uses: puddle-works/puddle-tooling/.github/workflows/contracts-check.yml@v0.2.0
 name: contracts-check
 
 on:
@@ -8,7 +8,7 @@ on:
       tooling-ref:
         description: puddle-tooling tag or branch whose check to run
         type: string
-        default: v0.1.1
+        default: v0.2.0
       deno-version:
         description: Deno version (match swamp's bundled Deno)
         type: string

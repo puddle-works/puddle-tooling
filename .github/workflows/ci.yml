@@ -21,10 +21,10 @@ jobs:
           deno-version: 2.9.7
 
       - name: Format
-        run: deno fmt --check contracts guardrails
+        run: deno fmt --check contracts guardrails fingerprint
 
-      - name: Test the checks
-        run: deno test --allow-read --allow-write contracts guardrails
+      - name: Test the checks and helpers
+        run: deno test --allow-read --allow-write contracts guardrails fingerprint
 
       - name: Test publish
         run: sh scripts/test_publish.sh
