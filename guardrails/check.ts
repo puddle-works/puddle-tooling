@@ -53,17 +53,35 @@ export function checkWorkflow(yamlText: string): string[] {
   return problems;
 }
 
-async function main(): Promise<void> {
-  let failed = false;
-  for await (const entry of Deno.readDir("workflows")) {
-    if (!entry.isFile || !entry.name.endsWith(".yaml")) continue;
-    const path = `workflows/${entry.name}`;
-    for (const problem of checkWorkflow(await Deno.readTextFile(path))) {
-      console.error(`${path}: ${problem}`);
-      failed = true;
+/**
+ * Checks every `workflows/*.yaml` under `root`. Each problem starts with the
+ * workflow's path. A repo with no workflows folder has no workflows, so it has
+ * no problems.
+ */
+export async function checkRepo(root = "."): Promise<string[]> {
+  const names: string[] = [];
+  try {
+    for await (const entry of Deno.readDir(`${root}/workflows`)) {
+      if (entry.isFile && entry.name.endsWith(".yaml")) names.push(entry.name);
+    }
+  } catch (err) {
+    if (!(err instanceof Deno.errors.NotFound)) throw err;
+  }
+  const problems: string[] = [];
+  for (const name of names.sort()) {
+    const path = `workflows/${name}`;
+    const text = await Deno.readTextFile(`${root}/${path}`);
+    for (const problem of checkWorkflow(text)) {
+      problems.push(`${path}: ${problem}`);
     }
   }
-  if (failed) Deno.exit(1);
+  return problems;
+}
+
+async function main(): Promise<void> {
+  const problems = await checkRepo();
+  for (const problem of problems) console.error(problem);
+  if (problems.length > 0) Deno.exit(1);
   console.log("guardrails-check: ok");
 }
 
