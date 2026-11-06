@@ -75,10 +75,16 @@ if ! swamp extension push "$manifest" --dry-run --json >"$out"; then
 in $manifest (swamp extension version shows the next one) and run again"
   already_published=1
 fi
-# Version drift is informational; every other warning family blocks.
-if [ "$(jq '[.warnings // {} | to_entries[] | select(.key != "versionDrift") | .value[]] | length' "$out")" != 0 ]; then
-  jq -r '.warnings | to_entries[] | select(.key != "versionDrift") | .value[]
-    | "  - [\(.ruleId // .check // "warning")] \(.message // .output)\(if .file then "\n    report: \(.file)" else "" end)"' "$out" >&2
+# Version drift is informational, and a repo may accept a warning on purpose by
+# naming its ruleId in ACCEPTED_WARNINGS (space separated). Every other warning
+# blocks.
+accept=$(jq -nc --arg a "${ACCEPTED_WARNINGS:-}" \
+  '$a | split(" ") | map(select(length > 0))')
+unresolved='[.warnings // {} | to_entries[] | select(.key != "versionDrift")
+  | .value[] | select((.ruleId // "") as $r | ($accept | index($r)) == null)]'
+if [ "$(jq --argjson accept "$accept" "$unresolved | length" "$out")" != 0 ]; then
+  jq -r --argjson accept "$accept" "$unresolved[]
+    | \"  - [\(.ruleId // .check // \"warning\")] \(.message // .output)\(if .file then \"\n    report: \(.file)\" else \"\" end)\"" "$out" >&2
   die "the dry run has unresolved warnings. Fix them (for a missing review, \
 write the skeleton from 'swamp extension push $manifest --dry-run --json' to the \
 report path with every verdict filled in) and run again. Never push with --yes."

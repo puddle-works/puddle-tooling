@@ -10,7 +10,8 @@
 #
 # Set PUDDLE_TOOLING_DIR to a local puddle-tooling checkout to use it instead
 # of the tagged release. Set PUBLISH_TESTS to what publish runs before pushing
-# (default: make test).
+# (default: make test). Set ACCEPTED_WARNINGS to the ruleIds of dry-run warnings
+# the repo accepts on purpose, separated by spaces (default: none).
 
 TOOLING_REF ?= v0.2.1
 TOOLING_URL ?= https://raw.githubusercontent.com/puddle-works/puddle-tooling/$(TOOLING_REF)
@@ -21,14 +22,15 @@ ifdef PUDDLE_TOOLING_DIR
 tooling_src = $(PUDDLE_TOOLING_DIR)
 tooling_script = env DENO="$(DENO)" VISIBILITY="$(VISIBILITY)" \
   DRY_RUN="$(DRY_RUN)" PUBLISH_TESTS="$(PUBLISH_TESTS)" \
-  sh $(PUDDLE_TOOLING_DIR)/scripts/publish.sh
+  ACCEPTED_WARNINGS="$(ACCEPTED_WARNINGS)" sh $(PUDDLE_TOOLING_DIR)/scripts/publish.sh
 else
 tooling_src = $(TOOLING_URL)
 # The settings sit on `sh`, not on `curl`: a prefix before a pipeline only
 # reaches its first command.
 tooling_script = curl -fsSL $(TOOLING_URL)/scripts/publish.sh | env \
   DENO="$(DENO)" VISIBILITY="$(VISIBILITY)" DRY_RUN="$(DRY_RUN)" \
-  PUBLISH_TESTS="$(PUBLISH_TESTS)" sh
+  PUBLISH_TESTS="$(PUBLISH_TESTS)" \
+  ACCEPTED_WARNINGS="$(ACCEPTED_WARNINGS)" sh
 endif
 
 .PHONY: contracts-check guardrails-check publish

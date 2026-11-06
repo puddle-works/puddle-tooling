@@ -46,6 +46,10 @@ case "\$1 \$2" in
           echo "{\"status\":\"dry_run\",\"contentHash\":\"abc\",\"registryChecks\":[{\"name\":\"authentication\",\"status\":\"passed\"},\$check]}"
           echo '{"error":"a registry check failed"}' >&2
           exit 1
+        elif [ -f "$tmp/warn-both" ]; then
+          echo '{"status":"dry_run","contentHash":"abc","warnings":{"review":[{"ruleId":"deno-command","message":"Line 1 uses Deno.Command()","file":"/repo/x.ts"},{"ruleId":"adversarial-review-report","message":"No adversarial review recorded","file":"/repo/r.json"}]}}'
+        elif [ -f "$tmp/warn-deno" ]; then
+          echo '{"status":"dry_run","contentHash":"abc","warnings":{"review":[{"ruleId":"deno-command","message":"Line 1 uses Deno.Command()","file":"/repo/x.ts"}]}}'
         elif [ -f "$tmp/warn" ]; then
           echo '{"status":"dry_run","contentHash":"abc","warnings":{"review":[{"ruleId":"adversarial-review-report","message":"No adversarial review recorded","file":"/repo/swamp-extension-review/_mesgme_demo-abc.json"}],"versionDrift":[{"output":"first publish"}]}}'
         else
@@ -119,6 +123,35 @@ else
   echo "ok  publish stops on a review warning and names the report"
 fi
 rm "$tmp/warn"
+
+# A repo may accept a named warning on purpose (ACCEPTED_WARNINGS, ruleIds
+# separated by spaces). Everything else still blocks.
+touch "$tmp/warn-deno"
+if run VISIBILITY=public DRY_RUN=1; then
+  echo "FAIL: publish passed a warning nobody accepted"; fail=1
+else
+  echo "ok  publish still stops on a warning that is not accepted"
+fi
+if ! run VISIBILITY=public DRY_RUN=1 ACCEPTED_WARNINGS="deno-command"; then
+  echo "FAIL: publish stopped on a warning the repo accepted"; cat "$tmp/out"; fail=1
+else
+  echo "ok  publish passes a warning the repo accepted"
+fi
+if run VISIBILITY=public DRY_RUN=1 ACCEPTED_WARNINGS="something-else"; then
+  echo "FAIL: publish passed although a different warning was accepted"; fail=1
+else
+  echo "ok  accepting one warning does not hide another rule"
+fi
+rm "$tmp/warn-deno"
+touch "$tmp/warn-both"
+if run VISIBILITY=public DRY_RUN=1 ACCEPTED_WARNINGS="deno-command"; then
+  echo "FAIL: an accepted warning hid a second, unaccepted warning"; fail=1
+elif ! grep -q "adversarial-review-report" "$tmp/out" || grep -q "deno-command" "$tmp/out"; then
+  echo "FAIL: publish did not list only the unaccepted warning"; cat "$tmp/out"; fail=1
+else
+  echo "ok  only the unaccepted warning is listed and blocks"
+fi
+rm "$tmp/warn-both"
 
 if ! run VISIBILITY=public; then
   echo "FAIL: publish failed on a clean puddle"; cat "$tmp/out"; fail=1
