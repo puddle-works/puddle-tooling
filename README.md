@@ -47,21 +47,24 @@ other failed registry check stops both.
 A dry-run warning blocks a publish. A repo that accepts one on purpose names its
 `ruleId` in its Makefile, for example `ACCEPTED_WARNINGS = deno-command` for an
 extension that reads the registry through the swamp CLI. Every other warning
-still blocks, and an accepted one is not listed.
+still blocks, and an accepted one is not listed. In CI, set the `accepted-warnings`
+input of the publish workflow to the same list: it runs the script directly,
+not through `make`.
 
 The same checks run in CI by calling the reusable workflows:
 
 ```yaml
 jobs:
   contracts:
-    uses: puddle-works/puddle-tooling/.github/workflows/contracts-check.yml@v0.2.1
+    uses: puddle-works/puddle-tooling/.github/workflows/contracts-check.yml@v0.2.2
   guardrails:
-    uses: puddle-works/puddle-tooling/.github/workflows/guardrails-check.yml@v0.2.1
+    uses: puddle-works/puddle-tooling/.github/workflows/guardrails-check.yml@v0.2.2
   publish:
-    uses: puddle-works/puddle-tooling/.github/workflows/publish.yml@v0.2.1
+    uses: puddle-works/puddle-tooling/.github/workflows/publish.yml@v0.2.2
     with:
       visibility: private
       dry-run: true       # false pushes
+      accepted-warnings: ""   # ruleIds accepted on purpose, e.g. deno-command
     secrets:
       SWAMP_API_KEY: ${{ secrets.SWAMP_API_KEY }}
       SWAMP_SIGNIN_TOKEN: ${{ secrets.SWAMP_SIGNIN_TOKEN }}
@@ -83,7 +86,7 @@ A repo whose workflows read another model's data through `data.latest` adds a
 `contracts.ts` that exports `CONTRACTS`, importing the types from this repo:
 
 ```ts
-import type { Contracts } from "https://raw.githubusercontent.com/puddle-works/puddle-tooling/v0.2.1/contracts/check.ts";
+import type { Contracts } from "https://raw.githubusercontent.com/puddle-works/puddle-tooling/v0.2.2/contracts/check.ts";
 import { model as thing } from "./extensions/models/thing.ts";
 
 export const CONTRACTS: Contracts = {
@@ -101,7 +104,7 @@ the fingerprint helper by tagged URL. Swamp's bundler inlines it when it
 bundles the extension, so the published package has no network import.
 
 ```ts
-import { assertFresh, fingerprint } from "https://raw.githubusercontent.com/puddle-works/puddle-tooling/v0.2.1/fingerprint/fingerprint.ts";
+import { assertFresh, fingerprint } from "https://raw.githubusercontent.com/puddle-works/puddle-tooling/v0.2.2/fingerprint/fingerprint.ts";
 
 // prepare: store the hash of what it read
 const stored = await fingerprint(note, settings.outputFolder);
