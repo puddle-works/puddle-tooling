@@ -44,6 +44,11 @@ bump `version:`, so CI stays green on PRs that do not publish and on `main`
 after a publish. A real push of that version stops and says to bump it. Any
 other failed registry check stops both.
 
+A dry-run warning blocks a publish. A repo that accepts one on purpose names its
+`ruleId` in its Makefile, for example `ACCEPTED_WARNINGS = deno-command` for an
+extension that reads the registry through the swamp CLI. Every other warning
+still blocks, and an accepted one is not listed.
+
 The same checks run in CI by calling the reusable workflows:
 
 ```yaml
