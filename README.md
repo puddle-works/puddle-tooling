@@ -12,7 +12,7 @@ copying the code.
 | `contracts/check.ts` | Fails when a workflow reads `data.latest(...)` fields its extension does not write. Reads the repo's own `contracts.ts`. |
 | `fingerprint/fingerprint.ts` | Hashes the inputs a `prepare` method saw and checks them again in `run`, so a gap between the two (a manual approval, say) cannot build output from stale input. |
 | `guardrails/check.ts` | Fails when a workflow lacks the `maxReruns` (3 to 10) and `maxWallClock` (up to 24h) tags. |
-| `scripts/publish.sh` | Tests, type-checks, quality-gates and dry-runs the extension, then pushes it. Never uses `--yes`. |
+| `scripts/publish.sh` | Tests, type-checks, quality-gates and dry-runs the extension, then pushes it. The quality gate needs no gate failure and every factor the CLI can score earned. Never uses `--yes`. |
 | `puddle.mk` | Make targets that run the above from the tagged release. |
 | `.github/workflows/` | Reusable `contracts-check`, `guardrails-check` and `publish` workflows. |
 

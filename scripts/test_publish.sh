@@ -31,7 +31,12 @@ echo "\$* REVIEW_DIR=\${SWAMP_EXTENSION_REVIEW_DIR:-}" >> "$tmp/swamp-calls"
 case "\$1 \$2" in
   "doctor extensions") echo '{"denoPath":"true"}' ;;
   "extension fmt") ;;
-  "extension quality") echo '{"percentage":85,"gateFailures":[]}' ;;
+  "extension quality")
+    if [ -f "$tmp/missing-factor" ]; then
+      echo '{"percentage":75,"earnedPoints":12,"maxClientEarnablePoints":14,"gateFailures":[],"factors":[{"id":"has-readme","label":"Has README or module doc","earnedPoints":0,"maxPoints":2,"status":"missing"},{"id":"repository-verified","label":"Verified public repository","earnedPoints":0,"maxPoints":2,"status":"provisional"}]}'
+    else
+      echo '{"percentage":87,"earnedPoints":14,"maxClientEarnablePoints":14,"gateFailures":[],"factors":[{"id":"repository-verified","label":"Verified public repository","earnedPoints":0,"maxPoints":2,"status":"provisional"}]}'
+    fi ;;
   "extension push")
     case "\$*" in
       *--dry-run*)
@@ -111,6 +116,18 @@ elif pushed; then
 else
   echo "ok  publish stops when the tests fail"
 fi
+
+touch "$tmp/missing-factor"
+if run VISIBILITY=public; then
+  echo "FAIL: publish succeeded with a quality factor missing"; fail=1
+elif pushed || grep -q -- '--dry-run' "$tmp/swamp-calls"; then
+  echo "FAIL: publish went on to the dry run or push with a quality factor missing"; fail=1
+elif ! grep -q "has-readme: Has README or module doc (0/2)" "$tmp/out" || ! grep -q "12/14 client points" "$tmp/out"; then
+  echo "FAIL: publish did not name the missing factor"; cat "$tmp/out"; fail=1
+else
+  echo "ok  publish stops when a client quality factor is missing, and names it"
+fi
+rm "$tmp/missing-factor"
 
 touch "$tmp/warn"
 if run VISIBILITY=public; then
