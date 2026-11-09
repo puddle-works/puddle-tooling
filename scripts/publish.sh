@@ -50,6 +50,13 @@ if [ "$(jq '.gateFailures | length' "$out")" != 0 ]; then
   jq -r '.gateFailures[] | "  - \(.)"' "$out" >&2
   die "quality gate failed; nothing was pushed"
 fi
+# Every factor the CLI can score must be earned. repository-verified stays
+# provisional until the registry checks the repo, so a clean local score is
+# B (87%), and A once the registry verifies a public repository.
+if ! jq -e '.earnedPoints == .maxClientEarnablePoints' "$out" >/dev/null; then
+  jq -r '.factors[] | select(.status == "missing" or .status == "partial") | "  - \(.id): \(.label) (\(.earnedPoints)/\(.maxPoints))"' "$out" >&2
+  die "quality: $(jq -r '"\(.earnedPoints)/\(.maxClientEarnablePoints)"' "$out") client points earned; earn the factors listed above. Nothing was pushed"
+fi
 
 # Review reports are bound to the content hash. Keeping them in the repo (swamp
 # adds swamp-extension-review/) lets them be committed and reviewed with the
