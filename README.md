@@ -56,11 +56,11 @@ The same checks run in CI by calling the reusable workflows:
 ```yaml
 jobs:
   contracts:
-    uses: puddle-works/puddle-tooling/.github/workflows/contracts-check.yml@v0.2.2
+    uses: puddle-works/puddle-tooling/.github/workflows/contracts-check.yml@v0.2.3
   guardrails:
-    uses: puddle-works/puddle-tooling/.github/workflows/guardrails-check.yml@v0.2.2
+    uses: puddle-works/puddle-tooling/.github/workflows/guardrails-check.yml@v0.2.3
   publish:
-    uses: puddle-works/puddle-tooling/.github/workflows/publish.yml@v0.2.2
+    uses: puddle-works/puddle-tooling/.github/workflows/publish.yml@v0.2.3
     with:
       visibility: private
       dry-run: true       # false pushes
@@ -86,7 +86,7 @@ A repo whose workflows read another model's data through `data.latest` adds a
 `contracts.ts` that exports `CONTRACTS`, importing the types from this repo:
 
 ```ts
-import type { Contracts } from "https://raw.githubusercontent.com/puddle-works/puddle-tooling/v0.2.2/contracts/check.ts";
+import type { Contracts } from "https://raw.githubusercontent.com/puddle-works/puddle-tooling/v0.2.3/contracts/check.ts";
 import { model as thing } from "./extensions/models/thing.ts";
 
 export const CONTRACTS: Contracts = {
@@ -104,7 +104,7 @@ the fingerprint helper by tagged URL. Swamp's bundler inlines it when it
 bundles the extension, so the published package has no network import.
 
 ```ts
-import { assertFresh, fingerprint } from "https://raw.githubusercontent.com/puddle-works/puddle-tooling/v0.2.2/fingerprint/fingerprint.ts";
+import { assertFresh, fingerprint } from "https://raw.githubusercontent.com/puddle-works/puddle-tooling/v0.2.3/fingerprint/fingerprint.ts";
 
 // prepare: store the hash of what it read
 const stored = await fingerprint(note, settings.outputFolder);
